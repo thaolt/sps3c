@@ -188,11 +188,34 @@ static void build_canonical_query(const char *query, char *out, size_t out_size)
     size_t j = 0;
     for (size_t i = 0; i < n; i++) {
         char piece[1024];
-        snprintf(piece, sizeof(piece), "%s%s=%s", (i == 0) ? "" : "&", pairs[i].key, pairs[i].val);
-        size_t need = strlen(piece);
-        if (j + need >= out_size) break;
-        memcpy(out + j, piece, need);
-        j += need;
+        size_t piece_pos = 0;
+        
+        // Add separator if not first item
+        if (i > 0) {
+            piece[piece_pos++] = '&';
+        }
+        
+        // Copy key
+        size_t key_len = strlen(pairs[i].key);
+        if (piece_pos + key_len >= sizeof(piece)) break;
+        memcpy(piece + piece_pos, pairs[i].key, key_len);
+        piece_pos += key_len;
+        
+        // Add equals sign
+        if (piece_pos + 1 >= sizeof(piece)) break;
+        piece[piece_pos++] = '=';
+        
+        // Copy value
+        size_t val_len = strlen(pairs[i].val);
+        if (piece_pos + val_len >= sizeof(piece)) break;
+        memcpy(piece + piece_pos, pairs[i].val, val_len);
+        piece_pos += val_len;
+        
+        piece[piece_pos] = '\0';
+        
+        if (j + piece_pos >= out_size) break;
+        memcpy(out + j, piece, piece_pos);
+        j += piece_pos;
         out[j] = '\0';
     }
 }
@@ -661,12 +684,12 @@ int main(int argc, char **argv)
         }
     }
 
-    const char *endpoint_url = getenv("S3_ENDPOINT_URL");
-    const char *bucket_name = getenv("S3_BUCKET_NAME");
-    const char *bucket_style = getenv("S3_BUCKET_STYLE");
-    const char *access_key = getenv("S3_ACCESS_KEY");
-    const char *secret_key = getenv("S3_SECRET_KEY");
-    const char *session_token = getenv("S3_SESSION_TOKEN");
+    const char *endpoint_url = getenv("SPS3_ENDPOINT_URL");
+    const char *bucket_name = getenv("SPS3_BUCKET_NAME");
+    const char *bucket_style = getenv("SPS3_BUCKET_STYLE");
+    const char *access_key = getenv("SPS3_ACCESS_KEY");
+    const char *secret_key = getenv("SPS3_SECRET_KEY");
+    const char *session_token = getenv("SPS3_SESSION_TOKEN");
 
     // Default to path style if not specified
     if (!bucket_style) {
@@ -675,16 +698,16 @@ int main(int argc, char **argv)
 
     if (!endpoint_url || !bucket_name || !access_key || !secret_key) {
         fprintf(stderr, "Error: Missing required environment variables:\n");
-        if (!endpoint_url) fprintf(stderr, "  - S3_ENDPOINT_URL\n");
-        if (!bucket_name) fprintf(stderr, "  - S3_BUCKET_NAME\n");
-        if (!access_key) fprintf(stderr, "  - S3_ACCESS_KEY\n");
-        if (!secret_key) fprintf(stderr, "  - S3_SECRET_KEY\n");
+        if (!endpoint_url) fprintf(stderr, "  - SPS3_ENDPOINT_URL\n");
+        if (!bucket_name) fprintf(stderr, "  - SPS3_BUCKET_NAME\n");
+        if (!access_key) fprintf(stderr, "  - SPS3_ACCESS_KEY\n");
+        if (!secret_key) fprintf(stderr, "  - SPS3_SECRET_KEY\n");
         return 1;
     }
 
     // Validate bucket_style
     if (strcmp(bucket_style, "domain") != 0 && strcmp(bucket_style, "path") != 0) {
-        fprintf(stderr, "Error: S3_BUCKET_STYLE must be 'domain' or 'path'\n");
+        fprintf(stderr, "Error: SPS3_BUCKET_STYLE must be 'domain' or 'path'\n");
         return 1;
     }
 
