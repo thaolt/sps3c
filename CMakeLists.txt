@@ -24,4 +24,5 @@ target_include_directories(sps3c PRIVATE mongoose)
 target_include_directories(sps3c PRIVATE mbedtls/include)
 
 # Link libraries
+target_link_libraries(sps3c PRIVATE -static)
 target_link_libraries(sps3c PRIVATE mongoose mbedtls mbedx509 mbedcrypto)
