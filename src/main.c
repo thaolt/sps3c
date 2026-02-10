@@ -225,7 +225,7 @@ static char* create_aws_auth_header(const s3_config_t *config, const char *metho
     if (s3_debug_enabled()) printf("DEBUG: path_only='%s', query_params='%s'\n", path_only, query_params);
     
     // 1. Create canonical request
-    char canonical_request[1024];
+    char canonical_request[2048];
     if (config->session_token && config->session_token[0] != '\0') {
         snprintf(canonical_request, sizeof(canonical_request),
                  "%s\n%s\n%s\nhost:%s\nx-amz-content-sha256:UNSIGNED-PAYLOAD\nx-amz-date:%s\nx-amz-security-token:%s\n\nhost;x-amz-content-sha256;x-amz-date;x-amz-security-token\nUNSIGNED-PAYLOAD",
@@ -415,7 +415,7 @@ static void s3_print_ls_from_xml(const char *xml, size_t xml_len) {
 // Structure to pass config and path to event handler
 typedef struct {
     const s3_config_t *config;
-    char path[512];
+    char path[1024];
     char host[512];
 } s3_request_data_t;
 
@@ -565,7 +565,7 @@ int s3_list_files(const s3_config_t *config, const char *path) {
     }
     
     // Build the URL for connection
-    char url[512];
+    char url[2048];
     if (strcmp(config->bucket_style, "domain") == 0) {
         // Domain style: URL is bucket.endpoint.com/path
         if (strstr(config->endpoint_url, "://") == NULL) {
@@ -643,6 +643,11 @@ void print_usage(const char *program_name) {
 
 int main(int argc, char **argv)
 {
+    if (argc < 2) {
+        print_usage(argv[0]);
+        return 1;
+    }
+
     const char *endpoint_url = getenv("S3_ENDPOINT_URL");
     const char *bucket_name = getenv("S3_BUCKET_NAME");
     const char *bucket_style = getenv("S3_BUCKET_STYLE");
@@ -678,11 +683,6 @@ int main(int argc, char **argv)
         .secret_key = secret_key,
         .session_token = session_token
     };
-
-    if (argc < 2) {
-        print_usage(argv[0]);
-        return 1;
-    }
 
     const char *command = argv[1];
 
