@@ -37,6 +37,21 @@ target_compile_definitions(mongoose PRIVATE MG_TLS=MG_TLS_MBED MG_ENABLE_MBEDTLS
 # Create executable
 add_executable(sps3c src/main.c)
 
+# Embed CA certificate (certs/cacert.pem) as a C string: `extern const char s_tls_ca[];`
+set(SPS3C_CA_PEM "${CMAKE_CURRENT_SOURCE_DIR}/certs/cacert.pem")
+set(SPS3C_CA_C "${CMAKE_CURRENT_BINARY_DIR}/generated/tls_ca.c")
+add_custom_command(
+    OUTPUT "${SPS3C_CA_C}"
+    COMMAND "${CMAKE_COMMAND}"
+        -DINPUT=${SPS3C_CA_PEM}
+        -DOUTPUT=${SPS3C_CA_C}
+        -DSYMBOL=s_tls_ca
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_pem_as_c.cmake"
+    DEPENDS "${SPS3C_CA_PEM}" "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed_pem_as_c.cmake"
+    VERBATIM
+)
+target_sources(sps3c PRIVATE "${SPS3C_CA_C}")
+
 # Include directories
 target_include_directories(sps3c PRIVATE src)
 target_include_directories(sps3c PRIVATE mongoose)

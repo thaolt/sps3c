@@ -7,6 +7,10 @@
 #include "mbedtls/sha256.h"
 #include "mbedtls/md.h"
 
+extern const char s_tls_ca[];
+
+static struct mg_str s_tls_ca_override = {NULL, 0};
+
 typedef struct {
     const char *endpoint_url;
     const char *bucket_name;
@@ -434,7 +438,8 @@ static void s3_event_handler(struct mg_connection *c, int ev, void *ev_data) {
         
         // Initialize TLS if needed
         if (c->is_tls) {
-            struct mg_tls_opts opts = {.ca = mg_str(""), .name = host_str};
+            struct mg_tls_opts opts = {.ca = s_tls_ca_override.buf ? s_tls_ca_override : mg_str(s_tls_ca),
+                                      .name = host_str};
             mg_tls_init(c, &opts);
         }
         
@@ -648,6 +653,14 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    const char *cert_bundle_path = getenv("SPS3_CERT_BUNDLE");
+    if (cert_bundle_path && cert_bundle_path[0] != '\0') {
+        s_tls_ca_override = mg_file_read(&mg_fs_posix, cert_bundle_path);
+        if (s_tls_ca_override.buf == NULL) {
+            fprintf(stderr, "Warning: failed to read SPS3_CERT_BUNDLE='%s'\n", cert_bundle_path);
+        }
+    }
+
     const char *endpoint_url = getenv("S3_ENDPOINT_URL");
     const char *bucket_name = getenv("S3_BUCKET_NAME");
     const char *bucket_style = getenv("S3_BUCKET_STYLE");
@@ -686,35 +699,46 @@ int main(int argc, char **argv)
 
     const char *command = argv[1];
 
+    int rc = 0;
     if (strcmp(command, "ls") == 0) {
         if (argc != 3) {
             fprintf(stderr, "Usage: %s ls <path>\n", argv[0]);
-            return 1;
+            rc = 1;
+            goto cleanup;
         }
-        return s3_list_files(&config, argv[2]);
+        rc = s3_list_files(&config, argv[2]);
     } else if (strcmp(command, "put") == 0) {
         if (argc != 4) {
             fprintf(stderr, "Usage: %s put <local_path> <remote_path>\n", argv[0]);
-            return 1;
+            rc = 1;
+            goto cleanup;
         }
-        return s3_put_file(&config, argv[2], argv[3]);
+        rc = s3_put_file(&config, argv[2], argv[3]);
     } else if (strcmp(command, "get") == 0) {
         if (argc < 3 || argc > 4) {
             fprintf(stderr, "Usage: %s get <remote_path> [local_path]\n", argv[0]);
-            return 1;
+            rc = 1;
+            goto cleanup;
         }
         const char *local_path = (argc == 4) ? argv[3] : NULL;
-        return s3_get_file(&config, argv[2], local_path);
+        rc = s3_get_file(&config, argv[2], local_path);
     } else if (strcmp(command, "diag") == 0) {
         if (argc != 2) {
             fprintf(stderr, "Usage: %s diag\n", argv[0]);
-            return 1;
+            rc = 1;
+            goto cleanup;
         }
         print_diagnostics(&config);
-        return 0;
+        rc = 0;
     } else {
         fprintf(stderr, "Unknown command: %s\n", command);
         print_usage(argv[0]);
-        return 1;
+        rc = 1;
     }
+
+cleanup:
+    mg_free((void *) s_tls_ca_override.buf);
+    s_tls_ca_override.buf = NULL;
+    s_tls_ca_override.len = 0;
+    return rc;
 }
